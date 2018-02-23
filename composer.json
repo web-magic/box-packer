@@ -1,0 +1,22 @@
+{
+    "name": "webmagic/box-packer",
+    "type": "library",
+    "description": "Realization of Burke packing algorithm",
+    "keywords": ["packing", "Burke"],
+    "homepage": "http://web-magic.space",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "WebMagic",
+            "email": "webmagic@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "WebMagic\\BoxPacker\\" : "src/"
+        }
+    }
+}

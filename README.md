@@ -1,2 +1,2 @@
-# box-packer
+# Box Packer
 Realization of Burke packing algorithm
