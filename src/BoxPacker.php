@@ -18,14 +18,19 @@ class BoxPacker
     /** @var array Sprite map */
     protected $map;
 
+    /** @var int Space between images */
+    protected $spaceBetween;
+
     /**
      * BoxPacker constructor.
      *
      * @param null $containerWidth
+     * @param int  $spaceBetween
      */
-    public function __construct($containerWidth)
+    public function __construct($containerWidth, $spaceBetween = 0)
     {
         $this->containerWidth = $containerWidth;
+        $this->spaceBetween = $spaceBetween;
     }
 
 
@@ -118,7 +123,7 @@ class BoxPacker
             $x = $freePositionData['lowestPosition'];
             $y = $freePositionData['lowest'];
             $width = $freePositionData['availableWidth'];
-            $bestFitImageIndex = $this->getBestFitBox($width);
+            $bestFitImageIndex = $this->getBestFitBox($width, $x);
 
             if (is_null($bestFitImageIndex)) {
                 $this->markCurrentFreeRowAsUnavailable($x, $width);
@@ -144,21 +149,6 @@ class BoxPacker
         $this->unpackedBoxes = $boxes;
     }
 
-
-    /**
-     * Return sprite map
-     *
-     * @return array
-     */
-    private function getMap()
-    {
-        if (empty($this->map)) {
-            $this->map = array_fill(0, $this->containerWidth, 0);
-        }
-
-        return $this->map;
-    }
-
     /**
      * Pack image
      *
@@ -170,7 +160,7 @@ class BoxPacker
     {
         $imageData = $this->unpackedBoxes[$index];
 
-        $this->updateMap($x, $imageData['width'], $imageData['height']);
+        $this->updateMap($x, $y, $imageData['width'], $imageData['height']);
         $this->markBoxPacked($index, $x, $y);
     }
 
@@ -181,13 +171,16 @@ class BoxPacker
      * @param $width
      * @param $height
      */
-    protected function updateMap($x, $width, $height)
+    protected function updateMap($x, $y, $width, $height)
     {
         $map = $this->getMap();
+        $firstPoint = $x;
         $lastPoint = $x + $width;
+        //Allowance for indentation for not first element
+        $lastPoint = $firstPoint !== 0 ? $lastPoint + $this->spaceBetween : $lastPoint;
 
         for (; $x < $lastPoint; $x++) {
-            $map[$x] += $height;
+            $map[$x] += $y !== 0 ? $height + $this->spaceBetween : $height;
         }
 
         $this->map = $map;
@@ -203,8 +196,8 @@ class BoxPacker
     protected function markBoxPacked($boxDataIndex, $x, $y)
     {
         $box = $this->unpackedBoxes[$boxDataIndex];
-        $box['x'] = $x;
-        $box['y'] = $y;
+        $box['x'] = $x !== 0 ? $x + $this->spaceBetween : 0;
+        $box['y'] = $y !== 0 ? $y + $this->spaceBetween : 0;
 
         $this->packedBoxes[] = $box;
         $unpackedBoxes = $this->unpackedBoxes;
@@ -245,16 +238,34 @@ class BoxPacker
     }
 
     /**
+     * Return sprite map
+     *
+     * @return array
+     */
+    private function getMap()
+    {
+        if (empty($this->map)) {
+            $this->map = array_fill(0, $this->containerWidth, 0);
+        }
+
+        return $this->map;
+    }
+
+    /**
      * Search for best fit image and return its index
      *
      * @param $availableWidth
+     * @param $x
      *
      * @return int|null|string
      */
-    private function getBestFitBox($availableWidth)
+    private function getBestFitBox($availableWidth, $x)
     {
         $bestFitIndex = null;
         $bestFitWidth = 0;
+
+        //Allowance for indentation for not first element
+        $availableWidth = $x === 0 ?: $availableWidth - $this->spaceBetween;
 
         foreach ($this->unpackedBoxes as $index => $imageData) {
             $imageWidth = $imageData['width'];
