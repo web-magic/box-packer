@@ -47,8 +47,10 @@ class BoxPacker
             'key' => $key,
             'width' => $width,
             'height' => $height,
+            'square' => $width * $height,
             'x' => null,
-            'y' => null
+            'y' => null,
+            'biggestSize' => null
         ];
     }
 
@@ -83,6 +85,201 @@ class BoxPacker
         $this->arrangeBoxes();
 
         return $this->packedBoxes;
+    }
+
+    /**
+     * @param int $height
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function packWithGivenHeightAndResize($height = 0)
+    {
+        $defaultResult = $this->defaultPacking($height);
+        if (!$defaultResult) {
+            return $defaultResult;
+        }
+
+        //Need for resize
+        $reduceStep = 1;
+
+        while ($this->getHeight() > $height) {
+            $this->reset();
+            $this->reduceWidthAndHeight($reduceStep);
+            $this->pack();
+        }
+
+        return $this->packedBoxes;
+    }
+
+    /**
+     * @param int $height
+     *
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function packWithGivenHeightAndNormalizedReduction($height = 0)
+    {
+//        $defaultResult = $this->defaultPacking($height);
+//        if ($defaultResult) {
+//            return $defaultResult;
+//        }
+//
+//        $this->reset();
+        $this->normalizeBoxesSizes();
+        $this->pack();
+
+        //Need for resize
+        $reduceStep = 1;
+        $givenHeight = $this->getHeight();
+
+        while ($givenHeight > $height) {
+            $this->reset();
+            $this->reduceWidthAndHeightOfBiggestBox($reduceStep);
+            $this->pack();
+
+            $givenHeight = $this->getHeight();
+        }
+
+        while ($givenHeight < $height) {
+            $this->reset();
+            $status = $this->increaseWidthAndHeightOfSmallestBox($reduceStep);
+            $this->pack();
+
+            $givenHeight = $this->getHeight();
+
+            if ($status === false) {
+                break;
+            }
+        }
+
+        return $this->packedBoxes;
+    }
+
+    /**
+     * Reduce all boxes with given rate
+     *
+     * @param int $step
+     */
+    protected function reduceWidthAndHeight($step = 1)
+    {
+        foreach ($this->unpackedBoxes as &$box) {
+            $box['width'] = $box['width'] - $step;
+            $box['height'] = $box['height'] - $step;
+        }
+    }
+
+    /**
+     * Reduce width and height of biggest box
+     *
+     * @param int $step
+     *
+     * @throws \Exception
+     */
+    protected function reduceWidthAndHeightOfBiggestBox($step = 1)
+    {
+        $max = 0;
+        $biggestKey = 0;
+        foreach ($this->unpackedBoxes as $key => $box) {
+            if ($max < $box['square']) {
+                $max = $box['square'];
+                $biggestKey = $key;
+            }
+        }
+
+        $this->unpackedBoxes[$biggestKey]['width'] = $this->unpackedBoxes[$biggestKey]['width'] - $step;
+        $this->unpackedBoxes[$biggestKey]['height'] = $this->unpackedBoxes[$biggestKey]['height'] - $step;
+        $this->unpackedBoxes[$biggestKey]['square'] = $this->unpackedBoxes[$biggestKey]['width'] * $this->unpackedBoxes[$biggestKey]['height'];
+
+        if ($this->unpackedBoxes[$biggestKey]['square'] <= 0) {
+            throw new \Exception('Current boxes can not be resized with current height');
+        }
+    }
+
+    /**
+     * Reduce width and height of smallest box
+     *
+     * @param int $step
+     *
+     * @return bool
+     */
+    protected function increaseWidthAndHeightOfSmallestBox($step = 1)
+    {
+        $min = $this->unpackedBoxes[0]['square'];
+        $smallestKey = 0;
+        foreach ($this->unpackedBoxes as $key => $box) {
+            if ($min > $box['square']) {
+                $min = $box['square'];
+                $smallestKey = $key;
+            }
+        }
+
+        $newWidth = $this->unpackedBoxes[$smallestKey]['width'] + $step;
+
+        if ($newWidth >= $this->containerWidth) {
+            return false;
+        }
+
+        $this->unpackedBoxes[$smallestKey]['width'] = $newWidth;
+        $this->unpackedBoxes[$smallestKey]['height'] = $this->unpackedBoxes[$smallestKey]['height'] + $step;
+        $this->unpackedBoxes[$smallestKey]['square'] = $newWidth * $this->unpackedBoxes[$smallestKey]['height'];
+    }
+
+    /**
+     * Normalize box sized based on minimal square
+     */
+    protected function normalizeBoxesSizes()
+    {
+        $min = $this->unpackedBoxes[0];
+        foreach ($this->unpackedBoxes as $key => $box) {
+            if ($min > $box['square']) {
+                $min = $box['square'];
+            }
+        }
+
+        $step = 1;
+        foreach ($this->unpackedBoxes as $key => &$box) {
+            while ($box['square'] > $min) {
+                $box['width'] = $box['width'] - $step;
+                $box['height'] = $box['height'] - $step;
+                $box['square'] = $box['width'] * $box['height'];
+            }
+        }
+    }
+
+    /**
+     * Default packing with set height
+     *
+     * @param $height
+     *
+     * @return array|bool
+     * @throws \Exception
+     */
+    protected function defaultPacking($height)
+    {
+        if ($height == 0) {
+            return $this->pack();
+        }
+
+        //Try pack without resizing
+        $this->pack();
+        $givenHeight = $this->getHeight();
+        if ($givenHeight == $height) {
+            return $this->packedBoxes;
+        }
+
+        return false;
+    }
+
+    /**
+     * Set packed boxes as unpacked
+     */
+    protected function reset()
+    {
+        $this->unpackedBoxes = $this->packedBoxes;
+        $this->packedBoxes = [];
+
+        unset($this->map);
     }
 
     /**
